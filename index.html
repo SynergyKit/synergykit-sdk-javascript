@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <link rel="stylesheet" media="all" href="public/css/mocha.css">
+        <script type="text/javascript" src="public/javascripts/mocha.js"></script>
+        <script type="text/javascript" src="public/javascripts/chai.js"></script>
+        <script type="text/javascript" src="public/javascripts/synergykit.js"></script>
+    </head>
+    <body>
+        <div id="mocha"><p><a href=".">Index</a></p></div>
+        <div id="messages"></div>
+        <div id="fixtures"></div>
+        <script>mocha.setup('bdd'); mocha.timeout(2000);</script>
+        <script src="test/index.js"></script>
+        <script>mocha.run();</script>
+    </body>
+</html>
