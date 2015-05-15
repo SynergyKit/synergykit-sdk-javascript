@@ -1,4 +1,4 @@
-// Synergykit JS SDK version 2.1.1
+// Synergykit JS SDK version 2.1.4
 var synergykitBasicApi = "https://%s.api.synergykit.com"
 var synergykitApiVersion = "/v2.1"
 
