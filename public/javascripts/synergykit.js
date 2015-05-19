@@ -694,11 +694,6 @@ Synergykit.rt = {
                     Synergykit.rt.removeListener(Synergykit.rt.queueRemove[i])
                 }
                 Synergykit.rt.queueRemove = []
-            })        
-            Synergykit.rt.socket.on("unauthorized", function(result) {
-                if(data.synergykit.debug) {
-                    console.log(result.message)
-                }        
             })
             Synergykit.rt.socket.on("unauthorized", function(result) {
                 if(data.synergykit.debug) {
