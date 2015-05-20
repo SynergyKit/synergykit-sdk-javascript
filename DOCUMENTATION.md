@@ -29,7 +29,7 @@ Include the module:
 ```
 Then initialize SynergyKit:
 ```javascript
-Synergykit.Init(your_application_url, your_application_key, {
+Synergykit.Init(application_name, application_key, {
     debug: true // You should set it to false in production
 });
 ```

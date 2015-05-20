@@ -12,7 +12,9 @@ var TENANT = "synergykit-sample-app",
 describe("SynergyKIT", function() {
     describe("Initialization", function() {
         it("should return intialization credentials", function() {
-            Synergykit.Init(TENANT, KEY)
+            Synergykit.Init(TENANT, KEY, {
+                api: "http://localhost:5078"
+            })
             chai.assert.equal(Synergykit.tenant, TENANT)
             chai.assert.equal(Synergykit.key, KEY)
         })
