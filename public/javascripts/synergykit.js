@@ -1127,6 +1127,11 @@ Synergykit.request = function(options, callbacks, object) {
                                         Synergykit.token = result.sessionToken
                                         object.synergykit = Synergykit
                                     }
+                                    if(Synergykit.isNumber(result)) {
+                                        result = {
+                                            count: result
+                                        }
+                                    }
                                     object.set(result)
                                     if (object instanceof Synergykit.modules.Users) {
                                         Synergykit.loggedUser = object

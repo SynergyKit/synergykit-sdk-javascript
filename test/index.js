@@ -223,6 +223,24 @@ describe("SynergyKIT", function() {
         })
     })
 
+    describe("GET /data?inlinecount=true", function(){
+        it("should return requested data with code 200", function(done) {
+            var gameScore = Synergykit.Data("GameScore")
+            var query = Synergykit.Query(gameScore).inlineCount()
+            query.find({
+                success: function(result, statusCode) {
+                    chai.assert.equal(statusCode, 200)
+                    chai.assert.equal(result.get("count"), 2)
+                    done()
+                },
+                error: function(error, statusCode) {
+                    chai.assert.equal(statusCode, 200)
+                    done()
+                }
+            })
+        })
+    })
+
     describe("GET /data/:url", function(){
         it("should return requested data with code 200", function(done) {
             var gameScore = Synergykit.Data("GameScore")
@@ -281,7 +299,6 @@ describe("SynergyKIT", function() {
             var query = Synergykit.Query(Synergykit.Data("GameScore"))
             query.find({
                 success: function(results, statusCode) {
-                    console.log(results.length)
                     chai.assert.equal(statusCode, 200)
                     chai.assert.equal(results.length, 2)
                     done()
