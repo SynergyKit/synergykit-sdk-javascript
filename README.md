@@ -107,7 +107,7 @@
 
 
 
-<pre class="prettyprint"><code class="language-javascript hljs ">Synergykit.Init(application_name, application_key, {
+<pre class="prettyprint"><code class="language-javascript hljs ">Synergykit.Init(TENANT, KEY, {
     debug: <span class="hljs-literal">true</span> <span class="hljs-comment">// You should set it to false in production</span>
 });</code></pre>
 
@@ -494,10 +494,10 @@ spaceShips.off(<span class="hljs-string">"created"</span>);</code></pre>
 
 
 <pre class="prettyprint"><code class="language-javascript hljs "><span class="hljs-comment">// Create reference to the collection</span>
-<span class="hljs-keyword">var</span> spaceShips = Skit.Data(<span class="hljs-string">"SpaceShips"</span>);
+<span class="hljs-keyword">var</span> spaceShips = Synergykit.Data(<span class="hljs-string">"SpaceShips"</span>);
 
 <span class="hljs-comment">// Create query and insert reference to collection or users or files as first parameter</span>
-<span class="hljs-keyword">var</span> query = Skit.Query(spaceShips);
+<span class="hljs-keyword">var</span> query = Synergykit.Query(spaceShips);
 query.where() <span class="hljs-comment">// Initialize filter</span>
 .attribute(<span class="hljs-string">"name"</span>) <span class="hljs-comment">// Attribute which you want filter. Notice that you can chain the query functions</span>
 .isEqualTo(<span class="hljs-string">"Anakin Skywalker"</span>)
@@ -542,8 +542,6 @@ query.where() <span class="hljs-comment">// Initialize filter</span>
 <li><code>&gt;</code> as <code>isGreaterThan</code></li>
 <li><code>&lt;</code> as <code>isLessThan</code></li>
 </ul>
-
-
 
 <h2 id="users">Users</h2>
 
@@ -895,6 +893,91 @@ user.login({
 });</code></pre>
 
 
+
+<h3 id="reset-password">Reset password</h3>
+
+<p>In case of forgotten password, you can reset it. You need to have template <strong>Reset password start</strong> and <strong>Reset password end</strong> in your mailings.</p>
+
+<table>
+<thead>
+<tr>
+  <th align="left">Parameter</th>
+  <th align="left">Type</th>
+  <th align="left">Notes</th>
+  <th align="center"></th>
+</tr>
+</thead>
+<tbody><tr>
+  <td align="left">_id</td>
+  <td align="left">string</td>
+  <td align="left">User ID</td>
+  <td align="center"><strong>required</strong></td>
+</tr>
+</tbody></table>
+
+
+
+
+<pre class="prettyprint"><code class="language-javascript hljs "><span class="hljs-comment">// Create instance of User object</span>
+<span class="hljs-keyword">var</span> user = Synergykit.User();
+user.set(<span class="hljs-string">"_id"</span>, <span class="hljs-string">"ID_OF_USER"</span>);
+
+<span class="hljs-comment">// And reset password</span>
+user.resetPassword({
+    success: <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(result, statusCode)</span> {</span>
+
+    },
+    error: <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(error, statusCode)</span> {</span>
+
+    }
+});</code></pre>
+
+
+
+<h3 id="change-password">Change password</h3>
+
+<p>User has also option to change his password when he is logged in.</p>
+
+<table>
+<thead>
+<tr>
+  <th align="left">Parameter</th>
+  <th align="left">Type</th>
+  <th align="left">Notes</th>
+  <th align="center"></th>
+</tr>
+</thead>
+<tbody><tr>
+  <td align="left">old_password</td>
+  <td align="left">string</td>
+  <td align="left">User old password</td>
+  <td align="center"><strong>required</strong></td>
+</tr>
+<tr>
+  <td align="left">password</td>
+  <td align="left">string</td>
+  <td align="left">User new password</td>
+  <td align="center"><strong>required</strong></td>
+</tr>
+</tbody></table>
+
+
+
+
+<pre class="prettyprint"><code class="language-javascript hljs "><span class="hljs-comment">// Create instance of User object</span>
+<span class="hljs-keyword">var</span> user = Synergykit.User();
+user.set(<span class="hljs-string">"old_password"</span>, <span class="hljs-string">"test"</span>)
+user.set(<span class="hljs-string">"password"</span>, <span class="hljs-string">"test2"</span>)
+
+<span class="hljs-comment">// And reset password</span>
+user.changePassword({
+    success: <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(user, statusCode)</span> {</span>
+
+    },
+    error: <span class="hljs-function"><span class="hljs-keyword">function</span><span class="hljs-params">(error, statusCode)</span> {</span>
+
+    }
+});</code></pre>
 
 <h3 id="add-platform-to-user">Add platform to user</h3>
 
@@ -1290,6 +1373,13 @@ Synergykit.runBatch({
 <h2 id="changelog">Changelog</h2>
 
 
+
+<h3 id="version-215-8-6-2015">Version 2.1.5 (8. 6. 2015)</h3>
+
+<ul>
+<li>User reset password</li>
+<li>User change password</li>
+</ul>
 
 <h3 id="version-214-22-4-2015">Version 2.1.4 (22. 4. 2015)</h3>
 

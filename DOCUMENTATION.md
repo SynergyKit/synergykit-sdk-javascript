@@ -27,9 +27,9 @@ Include the module:
 ```html
 <script type="text/javascript" src="https://synergykit.blob.core.windows.net/synergykit/synergykit.min.js"></script>
 ```
-Then initialize SynergyKit:
+Than initialize SynergyKit:
 ```javascript
-Synergykit.Init(application_name, application_key, {
+Synergykit.Init(TENANT, KEY, {
     debug: true // You should set it to false in production
 });
 ```
@@ -219,10 +219,10 @@ The OData Protocol specification defines how to standardize a typed, resource-or
 #### making query
 ```javascript
 // Create reference to the collection
-var spaceShips = Skit.Data("SpaceShips");
+var spaceShips = Synergykit.Data("SpaceShips");
 
 // Create query and insert reference to collection or users or files as first parameter
-var query = Skit.Query(spaceShips);
+var query = Synergykit.Query(spaceShips);
 query.where() // Initialize filter
 .attribute("name") // Attribute which you want filter. Notice that you can chain the query functions
 .isEqualTo("Anakin Skywalker")
@@ -457,6 +457,54 @@ user.login({
 });
 ```
 
+### Reset password
+In case of forgotten password, you can reset it. You need to have template **Reset password start** and **Reset password end** in your mailings.
+
+| Parameter | Type | Notes | |
+|:-|:-|:-|:-:|
+|_id |string| User ID | **required**
+
+```javascript
+// Create instance of User object
+var user = Synergykit.User();
+user.set("_id", "ID_OF_USER");
+
+// And reset password
+user.resetPassword({
+    success: function(result, statusCode) {
+        
+    },
+    error: function(error, statusCode) {
+        
+    }
+});
+```
+
+### Change password
+User has also option to change his password when he is logged in.
+
+| Parameter | Type | Notes | |
+|:-|:-|:-|:-:|
+|old_password |string| User old password | **required**
+|password |string| User new password | **required**
+
+```javascript
+// Create instance of User object
+var user = Synergykit.User();
+user.set("old_password", "test")
+user.set("password", "test2")
+
+// And reset password
+user.changePassword({
+    success: function(user, statusCode) {
+        
+    },
+    error: function(error, statusCode) {
+        
+    }
+});
+```
+
 ### Add platform to user
 Platforms are useful for pairing individual mobile devices or web applications to the user via registration ID. After assignment platform to the user you will be able to send push notifications to the device or application.
 
@@ -539,9 +587,9 @@ platform.destroy({
 ## Communication
 In SynergyKit you can communicate with your users by different ways. There are listed some methods below this section.
 
-One way is sending push notifications into user devices. This action need to have filled your API key for Android devices in Settings, section Android. For push notifications into iOS devices you need to fill your password and certificates into Apple section in Settings.
+One way is to sending push notifications into user devices. This action need to have filled your API key for Android devices in Settings, section Android. For push notifications into iOS devices you need to fill your password and certificates into Apple section in Settings.
 
-Another way is sending emails to your users. For this you need to create email templates in administration under Mailing section.
+Another way is to sending emails to your users. For this you need to create email templates in administration under Mailing section.
 
 ### Send notification
 
@@ -677,6 +725,11 @@ Synergykit.runBatch({
 })
 ```
 ## Changelog
+
+### Version 2.1.5 (8. 6. 2015)
+- User reset password
+- User change password
+
 ### Version 2.1.4 (22. 4. 2015)
 
 - **SynergyKit v2.1 support**
