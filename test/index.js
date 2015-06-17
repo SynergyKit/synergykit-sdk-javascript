@@ -20,50 +20,39 @@ describe("SynergyKIT", function() {
         })
     })
     describe("Testing API root", function() {
-        it("should return error null", function(done) {
-            Synergykit.request({},{
-                success: function(apiDetail, statusCode) {
-                    chai.assert.equal(apiDetail.tenant, TENANT)
-                    chai.assert.equal(statusCode, 200)
-                    done()
-                },
-                error: function(error, statusCode) {
-                    done()
-                }
+            it("should return error null", function(done) {
+                Synergykit.request({}, {
+                    success: function(apiDetail, statusCode) {
+                        chai.assert.equal(apiDetail.tenant, TENANT)
+                        chai.assert.equal(statusCode, 200)
+                        done()
+                    },
+                    error: function(error, statusCode) {
+                        done()
+                    }
+                })
             })
         })
-    })
-    // Batch
-    describe("Batch POST /data", function(){
+        // Batch
+    describe("Batch POST /data", function() {
         it("should return created data with code 200 twice", function(done) {
             var gameScore = Synergykit.Data("GameScore")
             gameScore.set("score", 1337)
-            gameScore.save()
-
-            var gameScore2 = Synergykit.Data("GameScore")
-            gameScore2.set("score", 1338)
-            gameScore2.save()
-            Synergykit.runBatch({
-                success: function(result) {
-                    chai.assert.equal(result.length, 2)
-                    
-                    for(var i in result) {
-                        var gameScoreResult = Synergykit.Data("GameScore")
-                        gameScoreResult.set("_id", result[i].get("_id"))
+            gameScore.save({
+                success: function(gameScoreResult) {
+                    gameScoreResult.destroy()
+                    chai.assert.equal(gameScoreResult.get("score"), 1337)
+                    var gameScore2 = Synergykit.Data("GameScore")
+                    gameScore2.set("score", 1338)
+                    gameScore2.save(function(err, gameScoreResult) {
                         gameScoreResult.destroy()
-                    }
-                    Synergykit.runBatch({
-                        success: function(result, statusCode) {
-                            chai.assert.equal(statusCode, 200)
-                            done()
-                        },
-                        error: function(error) {
-                        }
+                        chai.assert.equal(gameScoreResult.get("score"), 1338)
+                        done()
                     })
-                },
-                error: function(error) {
                 }
             })
+
+
         })
     })
 
@@ -112,38 +101,38 @@ describe("SynergyKIT", function() {
             })
         })
     })*/
-    describe("GET /files", function(){
-        it("should return files", function(done) {
-            var query = Synergykit.Query(Synergykit.File()).top(1)
-            query.find({
-                success: function(file, statusCode) {
-                    chai.assert.equal(statusCode, 200)
-                    FILE = file
-                    done()
-                },
-                error: function(error, statusCode) {
-                    chai.assert.equal(statusCode, 200)
-                    done()
-                }
+    describe("GET /files", function() {
+            it("should return files", function(done) {
+                var query = Synergykit.Query(Synergykit.File()).top(1)
+                query.find({
+                    success: function(file, statusCode) {
+                        chai.assert.equal(statusCode, 200)
+                        FILE = file
+                        done()
+                    },
+                    error: function(error, statusCode) {
+                        chai.assert.equal(statusCode, 200)
+                        done()
+                    }
+                })
             })
         })
-    })
-    /*describe("DELETE /files/:id", function(){
-        it("should delete file by id", function(done) {
-            FILE.destroy({
-                success: function(result, statusCode) {
-                    chai.assert.equal(statusCode, 200)
-                    done()
-                },
-                error: function(error, statusCode) {
-                    chai.assert.equal(statusCode, 200)
-                    done()
-                }
+        /*describe("DELETE /files/:id", function(){
+            it("should delete file by id", function(done) {
+                FILE.destroy({
+                    success: function(result, statusCode) {
+                        chai.assert.equal(statusCode, 200)
+                        done()
+                    },
+                    error: function(error, statusCode) {
+                        chai.assert.equal(statusCode, 200)
+                        done()
+                    }
+                })
             })
-        })
-    })*/
+        })*/
 
-    describe("POST /functions/:url", function(){
+    describe("POST /functions/:url", function() {
         it("should run function by url", function(done) {
             var cloudCode = Synergykit.CloudCode("example")
             cloudCode.set("name", "Anakin")
@@ -179,7 +168,7 @@ describe("SynergyKIT", function() {
         })
     })*/
 
-    describe("POST /data", function(){
+    describe("POST /data", function() {
         it("should return created data with code 200", function(done) {
             var gameScore = Synergykit.Data("GameScore")
             gameScore.set("score", 1337)
@@ -188,9 +177,10 @@ describe("SynergyKIT", function() {
                     chai.assert.equal(statusCode, 200)
                     gameScore.fetch({
                         success: function(refreshedGameScore, statusCode) {
+
                             chai.assert.equal(statusCode, 200)
-                            chai.assert.equal(refreshedGameScore.get("_id"), gameScore.get("_id"))  
-                            DATA = refreshedGameScore                          
+                            chai.assert.equal(refreshedGameScore.get("_id"), gameScore.get("_id"))
+                            DATA = refreshedGameScore
                             done()
                         },
                         error: function(error, statusCode) {
@@ -207,7 +197,7 @@ describe("SynergyKIT", function() {
         })
     })
 
-    describe("POST /data", function(){
+    describe("POST /data", function() {
         it("should return created data with code 200", function(done) {
             var gameScore = Synergykit.Data("GameScore")
             gameScore.set("score", 1337)
@@ -225,7 +215,7 @@ describe("SynergyKIT", function() {
         })
     })
 
-    describe("GET /data?inlinecount=true", function(){
+    describe("GET /data?inlinecount=true", function() {
         it("should return requested data with code 200", function(done) {
             var gameScore = Synergykit.Data("GameScore")
             var query = Synergykit.Query(gameScore).inlineCount()
@@ -243,7 +233,28 @@ describe("SynergyKIT", function() {
         })
     })
 
-    describe("GET /data/:url", function(){
+    describe("GET /data?inlinecount=true", function() {
+        it("should return requested data with code 200", function(done) {
+            var gameScore = Synergykit.Data("GameScore")
+            var query = Synergykit.Query(gameScore).inlineCount()
+            query.find()
+            query.find()
+            Synergykit.runBatch({
+                success: function(results, statusCode) {
+                    chai.assert.equal(statusCode, 200)
+                    chai.assert.equal(results[0].get("count"), 2)
+                    chai.assert.equal(results[1].get("count"), 2)
+                    done()
+                },
+                error: function(error, statusCode) {
+                    chai.assert.equal(statusCode, 200)
+                    done()
+                }
+            })
+        })
+    })
+
+    describe("GET /data/:url", function() {
         it("should return requested data with code 200", function(done) {
             var gameScore = Synergykit.Data("GameScore")
             var query = Synergykit.Query(gameScore)
@@ -260,7 +271,7 @@ describe("SynergyKIT", function() {
             })
         })
     })
-    describe("PUT /data/:url/:id", function(){
+    describe("PUT /data/:url/:id", function() {
         it("should return updated data with code 200", function(done) {
             var gameScore = Synergykit.Data("GameScore")
             gameScore.set(DATA.get())
@@ -279,7 +290,7 @@ describe("SynergyKIT", function() {
             })
         })
     })
-    describe("GET /data/:url with query", function(){
+    describe("GET /data/:url with query", function() {
         it("should return requested data with code 200", function(done) {
             var gameScore = Synergykit.Data("GameScore")
             var query = Synergykit.Query(gameScore).where().attribute("score").isEqualTo(1338)
@@ -296,7 +307,7 @@ describe("SynergyKIT", function() {
             })
         })
     })
-    describe("GET /data/:url with query", function(){
+    describe("GET /data/:url with query", function() {
         it("should return requested data with code 200", function(done) {
             var query = Synergykit.Query(Synergykit.Data("GameScore"))
             query.find({
@@ -312,7 +323,7 @@ describe("SynergyKIT", function() {
             })
         })
     })
-    describe("GET /data/:url/:id", function(){
+    describe("GET /data/:url/:id", function() {
         it("should return requested data by id with code 200", function(done) {
             var gameScore = Synergykit.Data("GameScore")
             gameScore.set("_id", DATA.get("_id"))
@@ -330,7 +341,7 @@ describe("SynergyKIT", function() {
         })
     })
 
-    describe("GET /data/:url/:id", function(){
+    describe("GET /data/:url/:id", function() {
         it("should return refreshed data by id with code 200", function(done) {
             DATA.fetch({
                 success: function(gameScore, statusCode) {
@@ -345,10 +356,10 @@ describe("SynergyKIT", function() {
             })
         })
     })
-    
-    
 
-    describe("POST /users", function(){
+
+
+    describe("POST /users", function() {
         it("should return created user", function(done) {
             var user = Synergykit.User()
             user.set("name", "Anakin Skywalker")
@@ -361,7 +372,7 @@ describe("SynergyKIT", function() {
                         success: function(refreshedUser, statusCode) {
                             chai.assert.equal(statusCode, 200)
                             chai.assert.equal(refreshedUser.get("hashedPassword"), user.get("hashedPassword"))
-                            USER = refreshedUser                          
+                            USER = refreshedUser
                             done()
                         },
                         error: function(error, statusCode) {
@@ -378,7 +389,7 @@ describe("SynergyKIT", function() {
         })
     })
 
-    describe("POST /users", function(){
+    describe("POST /users", function() {
         it("should return created user", function(done) {
             var user = Synergykit.User()
             user.set("name", "Anakin Skywalker 2")
@@ -391,7 +402,7 @@ describe("SynergyKIT", function() {
                         success: function(refreshedUser, statusCode) {
                             chai.assert.equal(statusCode, 200)
                             chai.assert.equal(refreshedUser.get("hashedPassword"), user.get("hashedPassword"))
-                            USER2 = refreshedUser                          
+                            USER2 = refreshedUser
                             done()
                         },
                         error: function(error, statusCode) {
@@ -408,7 +419,7 @@ describe("SynergyKIT", function() {
         })
     })
 
-    describe("POST /users/login", function(){
+    describe("POST /users/login", function() {
         it("should return logged user", function(done) {
             var user = Synergykit.User()
             user.set("email", "anakin@skywalker.com")
@@ -427,7 +438,7 @@ describe("SynergyKIT", function() {
         })
     })
 
-    describe("POST /data/:collection/:id/:user_id", function(){
+    describe("POST /data/:collection/:id/:user_id", function() {
         it("add access to data", function(done) {
             DATA.addAccess(USER, {
                 success: function(data, statusCode) {
@@ -444,7 +455,7 @@ describe("SynergyKIT", function() {
         })
     })
 
-    describe("DELETE /data/:collection/:id/:user_id", function(){
+    describe("DELETE /data/:collection/:id/:user_id", function() {
         it("remove access to data", function(done) {
             DATA.removeAccess(USER, {
                 success: function(data, statusCode) {
@@ -460,7 +471,7 @@ describe("SynergyKIT", function() {
         })
     })
 
-    describe("POST /files/:id/:user_id", function(){
+    describe("POST /files/:id/:user_id", function() {
         it("add access to file", function(done) {
             FILE.addAccess(USER, {
                 success: function(file, statusCode) {
@@ -477,7 +488,7 @@ describe("SynergyKIT", function() {
         })
     })
 
-    describe("DELETE /files/:id/:user_id", function(){
+    describe("DELETE /files/:id/:user_id", function() {
         it("remove access to file", function(done) {
             FILE.removeAccess(USER, {
                 success: function(file, statusCode) {
@@ -493,9 +504,9 @@ describe("SynergyKIT", function() {
         })
     })
 
-    describe("POST /users/:id/roles", function(){
-        it("should update user role by id", function(done) {          
-            USER2.addRole("test1",{
+    describe("POST /users/:id/roles", function() {
+        it("should update user role by id", function(done) {
+            USER2.addRole("test1", {
                 success: function(user, statusCode) {
                     chai.assert.equal(statusCode, 200)
                     chai.assert.equal(user.get("roles").length, 2)
@@ -508,9 +519,9 @@ describe("SynergyKIT", function() {
             })
         })
     })
-    describe("DELETE /users/:id/roles/test1", function(){
-        it("should update user role by id", function(done) {          
-            USER2.removeRole("test1",{
+    describe("DELETE /users/:id/roles/test1", function() {
+        it("should update user role by id", function(done) {
+            USER2.removeRole("test1", {
                 success: function(user, statusCode) {
                     chai.assert.equal(statusCode, 200)
                     chai.assert.equal(user.get("roles").length, 1)
@@ -524,7 +535,7 @@ describe("SynergyKIT", function() {
         })
     })
 
-    describe("POST /users/notification", function(){
+    describe("POST /users/notification", function() {
         it("should send notification to user", function(done) {
             var notification = Synergykit.Notification(USER)
             notification.set("alert", "I'm your father!")
@@ -541,7 +552,7 @@ describe("SynergyKIT", function() {
         })
     })
 
-    describe("POST /users/:id/platforms", function(){
+    describe("POST /users/:id/platforms", function() {
         it("should return added platform of user", function(done) {
             var platform = Synergykit.Platform()
             platform.set("platformName", "android")
@@ -554,7 +565,7 @@ describe("SynergyKIT", function() {
                         success: function(refreshedPlatform, statusCode) {
                             chai.assert.equal(statusCode, 200)
                             chai.assert.equal(refreshedPlatform.get("registrationId"), platform.get("registrationId"))
-                            PLATFORM = refreshedPlatform                          
+                            PLATFORM = refreshedPlatform
                             done()
                         },
                         error: function(error, statusCode) {
@@ -570,8 +581,8 @@ describe("SynergyKIT", function() {
             })
         })
     })
-    
-    describe("GET /users/:id/platforms/:platform", function(){
+
+    describe("GET /users/:id/platforms/:platform", function() {
         it("should return user platforms by id", function(done) {
             var platform = Synergykit.Platform()
             platform.set("_id", PLATFORM.get("_id"))
@@ -587,8 +598,8 @@ describe("SynergyKIT", function() {
                 }
             })
         })
-    })    
-    describe("PUT /users/:id/platforms/:platform", function(){
+    })
+    describe("PUT /users/:id/platforms/:platform", function() {
         it("should update user platform by id", function(done) {
             PLATFORM.set("registrationId", "2343wdhqr96899")
             PLATFORM.save({
@@ -605,7 +616,7 @@ describe("SynergyKIT", function() {
             })
         })
     })
-    describe("GET /users/:id/platforms", function(){
+    describe("GET /users/:id/platforms", function() {
         it("should get user platforms by query", function(done) {
             var platform = Synergykit.Platform()
             platform.fetch({
@@ -621,7 +632,7 @@ describe("SynergyKIT", function() {
             })
         })
     })
-    describe("DELETE /users/:id/platforms/:platform", function(){
+    describe("DELETE /users/:id/platforms/:platform", function() {
         it("should delete user platform and return empty object", function(done) {
             PLATFORM.destroy({
                 success: function(user, statusCode) {
@@ -637,7 +648,7 @@ describe("SynergyKIT", function() {
     })
 
 
-    describe("GET /users/:id", function(){
+    describe("GET /users/:id", function() {
         it("should return user by id", function(done) {
             var user = Synergykit.User()
             user.set("_id", USER.get("_id"))
@@ -653,9 +664,9 @@ describe("SynergyKIT", function() {
                 }
             })
         })
-    })    
-    describe("PUT /users/:id", function(){
-        it("should update user by id", function(done) {            
+    })
+    describe("PUT /users/:id", function() {
+        it("should update user by id", function(done) {
             USER.fetch({
                 success: function(user, statusCode) {
                     chai.assert.equal(statusCode, 200)
@@ -679,9 +690,9 @@ describe("SynergyKIT", function() {
             })
         })
     })
-    describe("GET /users", function(){
+    describe("GET /users", function() {
         it("should get users by query", function(done) {
-            var query = Synergykit.Query(Synergykit.User()).where().startsWith("name","Darth")
+            var query = Synergykit.Query(Synergykit.User()).where().startsWith("name", "Darth")
             query.find({
                 success: function(users, statusCode) {
                     chai.assert.equal(statusCode, 200)
@@ -695,14 +706,14 @@ describe("SynergyKIT", function() {
             })
         })
     })
-    describe("GET /users", function(){
+    describe("GET /users", function() {
         it("should get all users", function(done) {
             var user = Synergykit.User()
             var query = Synergykit.Query(user)
             query.find({
                 success: function(users, statusCode) {
                     chai.assert.equal(statusCode, 200)
-                    //chai.assert.equal(users.length, 2)
+                        //chai.assert.equal(users.length, 2)
                     done()
                 },
                 error: function(error, statusCode) {
@@ -712,7 +723,7 @@ describe("SynergyKIT", function() {
             })
         })
     })
-    describe("DELETE /users/:id", function(){
+    describe("DELETE /users/:id", function() {
         it("should delete user by id", function(done) {
             USER.destroy({
                 success: function(user, statusCode) {
@@ -727,7 +738,7 @@ describe("SynergyKIT", function() {
         })
     })
 
-    describe("DELETE /data/:url/:id", function(){
+    describe("DELETE /data/:url/:id", function() {
         it("should return empty object with code 200", function(done) {
             DATA.destroy({
                 success: function(gameScore, statusCode) {
@@ -741,7 +752,7 @@ describe("SynergyKIT", function() {
             })
         })
     })
-    describe("DELETE /data/:url/:id", function(){
+    describe("DELETE /data/:url/:id", function() {
         it("should return empty object and delete data 2", function(done) {
             DATA2.destroy({
                 success: function(gameScore, statusCode) {
@@ -756,7 +767,7 @@ describe("SynergyKIT", function() {
         })
     })
 
-    describe("POST /users/login", function(){
+    describe("POST /users/login", function() {
         it("should return logged user", function(done) {
             var user = Synergykit.User()
             user.set("email", "anakin2@skywalker.com")
@@ -775,7 +786,7 @@ describe("SynergyKIT", function() {
         })
     })
 
-    describe("DELETE /users/:id", function(){
+    describe("DELETE /users/:id", function() {
         it("should delete user 2 by id", function(done) {
             USER2.destroy({
                 success: function(user, statusCode) {

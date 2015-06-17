@@ -111,20 +111,6 @@ Data.prototype = Object.create(SynergykitObject.prototype, {
     }
 })
 
-Data.prototype.save = function(callbacks) {
-    if (this.get("_id") && this.get("__v") !== undefined) {
-        this.synergykit.request({
-            method: "PUT",
-            endpoint: this.endpoint + "/" + this.get("_id")
-        }, callbacks, this)
-    } else {
-        this.synergykit.request({
-            method: "POST",
-            endpoint: this.endpoint
-        }, callbacks, this)
-    }
-}
-
 Data.prototype.fetch = function(callbacks) {
     this.synergykit.request({
         method: "GET",
@@ -152,21 +138,7 @@ Data.prototype.removeAccess = function(user_id, callbacks) {
     }, callbacks, this)
 }
 
-Data.prototype.destroy = function(callbacks) {
-    if (this.get("_id")) {
-        this.synergykit.request({
-            method: "DELETE",
-            endpoint: this.endpoint + "/" + this.get("_id")
-        }, callbacks, this)
-    } else {
-        this.synergykit.request({
-            method: "DELETE",
-            endpoint: this.endpoint
-        }, callbacks, this)
-    }
-}
-
-Data.prototype.socketSave = function(callback) {
+Data.prototype.save = function(callback) {
     if (this.get("_id") && this.get("__v") !== undefined) {
         this.synergykit.socketUpdate(this, callback)
     } else {
@@ -174,12 +146,8 @@ Data.prototype.socketSave = function(callback) {
     }
 }
 
-Data.prototype.socketDestroy = function(callback) {
-    if (this.get("_id")) {
-        this.synergykit.socketDestroy(this, callback)
-    } else {
-        throw Errors.NO_ID
-    }
+Data.prototype.destroy = function(callback) {
+    this.synergykit.socketDestroy(this, callback)
 }
 
 Data.prototype.on = function(eventName, filter, callback) {
@@ -1101,6 +1069,34 @@ Synergykit.rt = {
         listener()
         Synergykit.rt.queue.push(listener)
     },
+    successCallback: function(data, result) {
+        var callback
+        if (data && data.object) {
+            data.object.set(result)
+            callback = data.object
+        } else {
+            callback = result
+        }
+        if (typeof data.callback === "function") {
+            data.callback(null, callback)
+        } else if (data.callback && typeof data.callback.success === "function") {
+            data.callback.success(callback, 200)
+        }
+    },
+    errorCallback: function(data, result) {
+        var callback
+        if (data && data.object) {
+            data.object.set(result)
+            callback = data.object
+        } else {
+            callback = result
+        }
+        if (typeof data.callback === "function") {
+            data.callback(result)
+        } else if (data.callback && typeof data.callback.error === "function") {
+            data.callback.error(callback, 400)
+        }
+    },
     create: function(data) {
         Synergykit.rt.checkConnection(data)
         var listener = function() {
@@ -1117,14 +1113,12 @@ Synergykit.rt = {
         }
         listener()
         Synergykit.rt.listeners["created"] = function(result) {
-            if (data && data.object) {
-                data.object.set(result)
-                data.callback(data.object)
-            } else {
-                data.callback(result)
-            }
-
+            Synergykit.rt.successCallback(data, result)
         }
+        Synergykit.rt.listeners["error"] = function(result) {
+            Synergykit.rt.errorCallback(data, result)
+        }
+
 
     },
     update: function(data) {
@@ -1144,204 +1138,39 @@ Synergykit.rt = {
         }
         listener()
         Synergykit.rt.listeners["updated"] = function(result) {
-            if (data && data.object) {
-                data.object.set(result)
-                data.callback(data.object)
-            } else {
-                data.callback(result)
-            }
-
+            Synergykit.rt.successCallback(data, result)
+        }
+        Synergykit.rt.listeners["error"] = function(result) {
+            Synergykit.rt.errorCallback(data, result)
         }
 
     },
     destroy: function(data) {
         Synergykit.rt.checkConnection(data)
+        var dataObject = {
+            tenant: data.synergykit.tenant,
+            token: data.synergykit.token,
+            key: data.synergykit.key,
+            collectionName: data.object.collection
+        }
+        if (data.object.get("_id")) {
+            dataObject.id = data.object.get("_id")
+        }
         var listener = function() {
             Synergykit.rt.send({
                 event: "delete",
-                data: {
-                    tenant: data.synergykit.tenant,
-                    token: data.synergykit.token,
-                    key: data.synergykit.key,
-                    collectionName: data.object.collection,
-                    id: data.object.get("_id")
-                }
+                data: dataObject
             })
         }
         listener()
         Synergykit.rt.listeners["deleted"] = function(result) {
-            if (data && data.object) {
-                data.object.set(result)
-                data.callback(data.object)
-            } else {
-                data.callback(result)
-            }
-
+            Synergykit.rt.successCallback(data, result)
+        }
+        Synergykit.rt.listeners["error"] = function(result) {
+            Synergykit.rt.errorCallback(data, result)
         }
 
     }
-}
-
-Synergykit.runBatch = function(callbacks) {
-    var method = "POST"
-    var endpoint = "/batch"
-    var uri = Synergykit.api + synergykitApiVersion + endpoint
-    if (Synergykit.debug) {
-        console.log('calling: ' + method + ' ' + uri);
-    }
-    Synergykit._start = new Date().getTime()
-
-    var request = Synergykit.createCORSRequest(method, uri);
-    request.setRequestHeader("Content-Type", "application/json")
-
-    if (Synergykit.token) {
-        request.setRequestHeader("SessionToken", Synergykit.token)
-    }
-
-    request.setRequestHeader("Authorization", "Basic " + Synergykit.Base64.encode(Synergykit.tenant + ":" + Synergykit.key))
-    request.onload = function() {
-        try {
-            var results = JSON.parse(request.responseText)
-            Synergykit._end = new Date().getTime()
-            if (request.status >= 200 && request.status < 400) {
-                if (Synergykit.debug) {
-                    console.log('Success (time: ' + Synergykit.calcTimeDiff() + '): POST ' + uri);
-                }
-                if (callbacks && typeof(callbacks.success) === "function") {
-                    var resultCallback = []
-                    for (var i in results) {
-                        var result = results[i]
-                        var response = null
-                        var resultBody = result.body
-                        if (result.statusCode == 200) {
-                            if (Synergykit.batches[result.id] && Synergykit.batches[result.id].object instanceof SynergykitObject) {
-                                var object = Synergykit.batches[result.id].object
-                                if (resultBody) {
-                                    if (Synergykit.isArray(resultBody)) {
-                                        if (resultBody.length > 0) {
-                                            response = []
-                                            for (var j in resultBody) {
-                                                var clonedObject = null
-                                                if (object instanceof Synergykit.modules.Data) {
-                                                    clonedObject = Synergykit.Data(object.collection)
-                                                } else if (object instanceof Synergykit.modules.Files) {
-                                                    clonedObject = Synergykit.modules.File(object.path)
-                                                } else if (object instanceof Synergykit.modules.Functions) {
-                                                    clonedObject = Synergykit.CloudCode(object.url)
-                                                } else if (object instanceof Synergykit.modules.Logs) {
-
-                                                } else if (object instanceof Synergykit.modules.Mailing) {
-                                                    clonedObject = Synergykit.Mail(object.url)
-                                                } else if (object instanceof Synergykit.modules.Platforms) {
-                                                    clonedObject = Synergykit.Platform(object.user_id)
-                                                } else if (object instanceof Synergykit.modules.Users) {
-                                                    clonedObject = Synergykit.User()
-                                                }
-                                                clonedObject.set(resultBody[j])
-                                                response.push(clonedObject)
-                                            }
-                                        } else {
-                                            response = resultBody
-                                        }
-                                    } else {
-                                        if (object instanceof Synergykit.modules.Users && resultBody.sessionToken) {
-                                            Synergykit.token = resultBody.sessionToken
-                                            object.synergykit = Synergykit
-                                        }
-                                        object.set(resultBody)
-                                        if (object instanceof Synergykit.modules.Users) {
-                                            Synergykit.loggedUser = object
-                                        }
-                                        response = object
-                                    }
-                                }
-                                resultCallback.push(response)
-                                    //console.log(resultCallback)
-                            }
-                        } else {
-                            resultCallback.push({
-                                status: result.status,
-                                code: result.code,
-                                message: result.message
-                            })
-                        }
-                    }
-                    Synergykit.batches = []
-                    try {
-                        callbacks.success(resultCallback, request.status)
-                    } catch (e) {
-                        console.error(e.stack)
-                        if (Synergykit.errorCallback) {
-                            Synergykit.errorCallback({
-                                status: "error",
-                                code: "SKIT01-001",
-                                message: e.message
-                            })
-                        }
-                    }
-                } else {
-                    //throw Errors.NO_SUCCESS_CALLBACK 
-                }
-            } else {
-                Synergykit.batches = []
-                err = true
-                var code = result && result.code ? result.code : "SKIT01-001"
-                var message = result && result.message ? result.message : ""
-                if (Synergykit.debug) {
-                    console.log('Error (' + request.status + ')(' + code + '): ' + message);
-                }
-                if (callbacks && typeof(callbacks.error) === "function") {
-                    try {
-                        callbacks.error(result, request.status)
-                    } catch (e) {
-                        console.error(e.stack)
-                        if (Synergykit.errorCallback) {
-                            Synergykit.errorCallback({
-                                status: "error",
-                                code: "SKIT01-001",
-                                message: e.message
-                            })
-                        }
-                    }
-                } else {
-                    //throw Synergykit.Errors.NO_ERROR_CALLBACK 
-                }
-            }
-
-        } catch (e) {
-            console.error(e.stack)
-        }
-    }
-
-    request.onerror = function() {
-
-    }
-
-    var body = []
-    for (var i in Synergykit.batches) {
-        var batch = Synergykit.batches[i]
-        var queryString = ""
-        if (batch.options.query) {
-            var qs = batch.options.query || {}
-            var counter = 0
-            for (var j in qs) {
-                if (counter == 0) {
-                    queryString += "?"
-                } else {
-                    queryString += "&"
-                }
-                queryString += j + "=" + qs[j]
-                counter++
-            }
-        }
-        body.push({
-            id: parseInt(i),
-            method: batch.options.method,
-            endpoint: batch.options.endpoint + queryString,
-            body: batch.options.body ? batch.options.body : batch.object.get()
-        })
-    }
-    request.send(JSON.stringify(body))
 }
 
 Synergykit.request = function(options, callbacks, object) {
@@ -1400,93 +1229,54 @@ Synergykit.request = function(options, callbacks, object) {
                         console.log('Success (time: ' + Synergykit.calcTimeDiff() + '): ' + method + ' ' + uri + queryString);
                     }
 
-                    if (callbacks && typeof(callbacks.success) === "function") {
-                        if (object instanceof SynergykitObject) {
-                            var response = null
-                            if (result) {
-                                if (Synergykit.isArray(result)) {
-                                    if (result.length > 0) {
-                                        response = []
-                                        for (var i in result) {
-                                            var clonedObject = null
-                                            if (object instanceof Synergykit.modules.Data) {
-                                                clonedObject = Synergykit.Data(object.collection)
-                                            } else if (object instanceof Synergykit.modules.Files) {
-                                                clonedObject = Synergykit.modules.File(object.path)
-                                            } else if (object instanceof Synergykit.modules.Functions) {
-                                                clonedObject = Synergykit.CloudCode(object.url)
-                                            } else if (object instanceof Synergykit.modules.Logs) {
+                    if (object instanceof SynergykitObject) {
+                        var response = null
+                        if (result) {
+                            if (Synergykit.isArray(result)) {
+                                if (result.length > 0) {
+                                    response = []
+                                    for (var i in result) {
+                                        var clonedObject = null
+                                        if (object instanceof Synergykit.modules.Data) {
+                                            clonedObject = Synergykit.Data(object.collection)
+                                        } else if (object instanceof Synergykit.modules.Files) {
+                                            clonedObject = Synergykit.modules.File(object.path)
+                                        } else if (object instanceof Synergykit.modules.Functions) {
+                                            clonedObject = Synergykit.CloudCode(object.url)
+                                        } else if (object instanceof Synergykit.modules.Logs) {
 
-                                            } else if (object instanceof Synergykit.modules.Mailing) {
-                                                clonedObject = Synergykit.Mail(object.url)
-                                            } else if (object instanceof Synergykit.modules.Platforms) {
-                                                clonedObject = Synergykit.Platform(object.user_id)
-                                            } else if (object instanceof Synergykit.modules.Users) {
-                                                clonedObject = Synergykit.User()
-                                            }
-                                            clonedObject.set(result[i])
-                                            response.push(clonedObject)
+                                        } else if (object instanceof Synergykit.modules.Mailing) {
+                                            clonedObject = Synergykit.Mail(object.url)
+                                        } else if (object instanceof Synergykit.modules.Platforms) {
+                                            clonedObject = Synergykit.Platform(object.user_id)
+                                        } else if (object instanceof Synergykit.modules.Users) {
+                                            clonedObject = Synergykit.User()
                                         }
-                                    } else {
-                                        response = result
+                                        clonedObject.set(result[i])
+                                        response.push(clonedObject)
                                     }
                                 } else {
-                                    if (object instanceof Synergykit.modules.Users && result.sessionToken) {
-                                        Synergykit.token = result.sessionToken
-                                        object.synergykit = Synergykit
-                                    }
-                                    if (Synergykit.isNumber(result)) {
-                                        result = {
-                                            count: result
-                                        }
-                                    }
-                                    object.set(result)
-                                    if (object instanceof Synergykit.modules.Users) {
-                                        Synergykit.loggedUser = object
-                                    }
-                                    response = object
+                                    response = result
                                 }
-                            }
-                            try {
-                                callbacks.success(response, request.status)
-                            } catch (e) {
-                                console.error(e.stack)
-                                if (Synergykit.errorCallback) {
-                                    Synergykit.errorCallback({
-                                        status: "error",
-                                        code: "SKIT01-001",
-                                        message: e.message
-                                    })
+                            } else {
+                                if (object instanceof Synergykit.modules.Users && result.sessionToken) {
+                                    Synergykit.token = result.sessionToken
+                                    object.synergykit = Synergykit
                                 }
-                            }
-                        } else {
-                            try {
-                                callbacks.success(result, request.status)
-                            } catch (e) {
-                                console.error(e.stack)
-                                if (Synergykit.errorCallback) {
-                                    Synergykit.errorCallback({
-                                        status: "error",
-                                        code: "SKIT01-001",
-                                        message: e.message
-                                    })
+                                if (Synergykit.isNumber(result)) {
+                                    result = {
+                                        count: result
+                                    }
                                 }
+                                object.set(result)
+                                if (object instanceof Synergykit.modules.Users) {
+                                    Synergykit.loggedUser = object
+                                }
+                                response = object
                             }
-
                         }
-                    } else {
-                        //throw Synergykit.Errors.NO_SUCCESS_CALLBACK 
-                    }
-                } else {
-                    err = true
-                    var code = result && result.code ? result.code : "SKIT01-001"
-                    var message = result && result.message ? result.message : ""
-                    if (Synergykit.debug) {
-                        console.log('Error (' + request.status + ')(' + code + '): ' + message);
-                    }
-                    if (callbacks && typeof(callbacks.error) === "function") {
                         try {
-                            callbacks.error(result, request.status)
+                            Synergykit.callback(callbacks, response, request.status)
                         } catch (e) {
                             console.error(e.stack)
                             if (Synergykit.errorCallback) {
@@ -1498,7 +1288,38 @@ Synergykit.request = function(options, callbacks, object) {
                             }
                         }
                     } else {
-                        //throw Synergykit.Errors.NO_ERROR_CALLBACK 
+                        try {
+                            Synergykit.callback(callbacks, result, request.status)
+                        } catch (e) {
+                            console.error(e.stack)
+                            if (Synergykit.errorCallback) {
+                                Synergykit.errorCallback({
+                                    status: "error",
+                                    code: "SKIT01-001",
+                                    message: e.message
+                                })
+                            }
+                        }
+
+                    }
+                } else {
+                    err = true
+                    var code = result && result.code ? result.code : "SKIT01-001"
+                    var message = result && result.message ? result.message : ""
+                    if (Synergykit.debug) {
+                        console.log('Error (' + request.status + ')(' + code + '): ' + message);
+                    }
+                    try {
+                        Synergykit.callback(callbacks, result, request.status)
+                    } catch (e) {
+                        console.error(e.stack)
+                        if (Synergykit.errorCallback) {
+                            Synergykit.errorCallback({
+                                status: "error",
+                                code: "SKIT01-001",
+                                message: e.message
+                            })
+                        }
                     }
                 }
             } catch (e) {
@@ -1517,6 +1338,182 @@ Synergykit.request = function(options, callbacks, object) {
         }
     }
 }
+
+Synergykit.runBatch = function(callbacks) {
+    var method = "POST"
+    var endpoint = "/batch"
+    var uri = Synergykit.api + synergykitApiVersion + endpoint
+    if (Synergykit.debug) {
+        console.log('calling: ' + method + ' ' + uri);
+    }
+    Synergykit._start = new Date().getTime()
+
+    var request = Synergykit.createCORSRequest(method, uri);
+    request.setRequestHeader("Content-Type", "application/json")
+
+    if (Synergykit.token) {
+        request.setRequestHeader("SessionToken", Synergykit.token)
+    }
+    request.setRequestHeader("Authorization", "Basic " + Synergykit.Base64.encode(Synergykit.tenant + ":" + Synergykit.key))
+    request.onload = function() {
+        try {
+            var results = JSON.parse(request.responseText)
+            Synergykit._end = new Date().getTime()
+            if (request.status >= 200 && request.status < 400) {
+                if (Synergykit.debug) {
+                    console.log('Success (time: ' + Synergykit.calcTimeDiff() + '): POST ' + uri);
+                }
+                var resultCallback = []
+                for (var i in results) {
+                    var result = results[i]
+                    var response = null
+                    var resultBody = result.body
+                    if (result.statusCode == 200) {
+                        if (Synergykit.batches[result.id] && Synergykit.batches[result.id].object instanceof SynergykitObject) {
+                            var object = Synergykit.batches[result.id].object
+                            if (resultBody) {
+                                if (Synergykit.isArray(resultBody)) {
+                                    if (resultBody.length > 0) {
+                                        response = []
+                                        for (var j in resultBody) {
+                                            var clonedObject = null
+                                            if (object instanceof Synergykit.modules.Data) {
+                                                clonedObject = Synergykit.Data(object.collection)
+                                            } else if (object instanceof Synergykit.modules.Files) {
+                                                clonedObject = Synergykit.modules.File(object.path)
+                                            } else if (object instanceof Synergykit.modules.Functions) {
+                                                clonedObject = Synergykit.CloudCode(object.url)
+                                            } else if (object instanceof Synergykit.modules.Logs) {
+
+                                            } else if (object instanceof Synergykit.modules.Mailing) {
+                                                clonedObject = Synergykit.Mail(object.url)
+                                            } else if (object instanceof Synergykit.modules.Platforms) {
+                                                clonedObject = Synergykit.Platform(object.user_id)
+                                            } else if (object instanceof Synergykit.modules.Users) {
+                                                clonedObject = Synergykit.User()
+                                            }
+                                            clonedObject.set(resultBody[j])
+                                            response.push(clonedObject)
+                                        }
+                                    } else {
+                                        response = resultBody
+                                    }
+                                } else {
+                                    if (object instanceof Synergykit.modules.Users && resultBody.sessionToken) {
+                                        Synergykit.token = resultBody.sessionToken
+                                        object.synergykit = Synergykit
+                                    }
+                                    if (Synergykit.isNumber(resultBody)) {
+                                        resultBody = {
+                                            count: resultBody
+                                        }
+                                    }
+                                    object.set(resultBody)
+                                    if (object instanceof Synergykit.modules.Users) {
+                                        Synergykit.loggedUser = object
+                                    }
+                                    response = object
+                                }
+                            }
+                            resultCallback.push(response)
+                                //console.log(resultCallback)
+                        }
+                    } else {
+                        resultCallback.push({
+                            status: result.status,
+                            code: result.code,
+                            message: result.message
+                        })
+                    }
+                }
+                Synergykit.batches = []
+                try {
+                    Synergykit.callback(callbacks, resultCallback, request.status)
+                } catch (e) {
+                    console.error(e.stack)
+                    if (Synergykit.errorCallback) {
+                        Synergykit.errorCallback({
+                            status: "error",
+                            code: "SKIT01-001",
+                            message: e.message
+                        })
+                    }
+                }
+            } else {
+                Synergykit.batches = []
+                err = true
+                var code = result && result.code ? result.code : "SKIT01-001"
+                var message = result && result.message ? result.message : ""
+                if (Synergykit.debug) {
+                    console.log('Error (' + request.status + ')(' + code + '): ' + message);
+                }
+                try {
+                    Synergykit.callback(callbacks, result, request.status)
+                } catch (e) {
+                    console.error(e.stack)
+                    if (Synergykit.errorCallback) {
+                        Synergykit.errorCallback({
+                            status: "error",
+                            code: "SKIT01-001",
+                            message: e.message
+                        })
+                    }
+                }
+            }
+
+        } catch (e) {
+            console.error(e.stack)
+        }
+    }
+
+    request.onerror = function() {
+
+    }
+
+    var body = []
+    for (var i in Synergykit.batches) {
+        var batch = Synergykit.batches[i]
+        var queryString = ""
+        if (batch.options.query) {
+            var qs = batch.options.query || {}
+            var counter = 0
+            for (var j in qs) {
+                if (counter == 0) {
+                    queryString += "?"
+                } else {
+                    queryString += "&"
+                }
+                queryString += j + "=" + qs[j]
+                counter++
+            }
+        }
+        body.push({
+            id: parseInt(i),
+            method: batch.options.method,
+            endpoint: batch.options.endpoint + queryString,
+            body: batch.options.body ? batch.options.body : batch.object.get()
+        })
+    }
+    request.send(JSON.stringify(body))
+}
+
+Synergykit.callback = function(callbacks, data, statusCode) {
+    if (statusCode == 200) {
+        if (typeof callbacks === "function") {
+            callbacks(null, data, statusCode)
+        } else if (callbacks && typeof callbacks.success === "function") {
+            callbacks.success(data, statusCode)
+        }
+    } else {
+        if (typeof callbacks === "function") {
+            callbacks(data, null, statusCode)
+        } else if (callbacks && typeof callbacks.error === "function") {
+            callbacks.error(data, statusCode)
+        }
+    }
+}
+
+
 
 Synergykit.createCORSRequest = function(method, url) {
     var xhr = new XMLHttpRequest();
