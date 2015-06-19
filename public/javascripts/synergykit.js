@@ -150,6 +150,34 @@ Data.prototype.destroy = function(callback) {
     this.synergykit.socketDestroy(this, callback)
 }
 
+Data.prototype.saveHTTP = function(callbacks) {
+    if (this.get("_id") && this.get("__v") !== undefined) {
+        this.synergykit.request({
+            method: "PUT",
+            endpoint: this.endpoint + "/" + this.get("_id")
+        }, callbacks, this)
+    } else {
+        this.synergykit.request({
+            method: "POST",
+            endpoint: this.endpoint
+        }, callbacks, this)
+    }
+}
+
+Data.prototype.destroyHTTP = function(callbacks) {
+    if (this.get("_id")) {
+        this.synergykit.request({
+            method: "DELETE",
+            endpoint: this.endpoint + "/" + this.get("_id")
+        }, callbacks, this)
+    } else {
+        this.synergykit.request({
+            method: "DELETE",
+            endpoint: this.endpoint
+        }, callbacks, this)
+    }
+}
+
 Data.prototype.on = function(eventName, filter, callback) {
     var options = {
         eventName: eventName
