@@ -9,6 +9,7 @@ var Synergykit = {
     loggedUser: null,
     debug: false,
     local: false,
+    strategy: "sockets",
     api: "",
     modules: {},
     batches: []
@@ -21,10 +22,15 @@ Synergykit.Init = function(tenant, key, options) {
     Synergykit.debug = options.debug || false
     Synergykit.api = "https://" + synergykitBasicApi.replace("%s", Synergykit.tenant)
     Synergykit.socketApi = "wss://" + synergykitBasicApi.replace("%s", Synergykit.tenant)
+    Synergykit.token = null
+    Synergykit.batches = []
     if (options.local) {
         Synergykit.local = true
         Synergykit.api = "http://localhost:5078"
         Synergykit.socketApi = "ws://localhost:5078"
+    }
+    if (options.strategy) {
+        Synergykit.strategy = options.strategy
     }
 }
 
@@ -96,7 +102,7 @@ SynergykitObject.prototype.get = function(key) {
 function Data(collection, synergykit) {
     Data.super_.apply(this, arguments)
     this.synergykit = synergykit
-    this.collection = collection
+    this.collection = Synergykit.urlify(collection)
     this.endpoint = "/data/" + Synergykit.urlify(collection)
     this.query = {}
 }
@@ -112,10 +118,56 @@ Data.prototype = Object.create(SynergykitObject.prototype, {
 })
 
 Data.prototype.fetch = function(callbacks) {
-    this.synergykit.request({
-        method: "GET",
-        endpoint: this.endpoint + "/" + this.get("_id")
-    }, callbacks, this)
+    if (this.synergykit.strategy == "sockets") {
+        this.synergykit.socketGet(this, null, callbacks)
+    } else {
+        this.synergykit.request({
+            method: "GET",
+            endpoint: this.endpoint + "/" + this.get("_id")
+        }, callbacks, this)
+    }
+
+}
+
+Data.prototype.save = function(callbacks) {
+    if (this.synergykit.strategy == "sockets") {
+        if (this.get("_id") && this.get("__v") !== undefined) {
+            this.synergykit.socketUpdate(this, callbacks)
+        } else {
+            this.synergykit.socketCreate(this, callbacks)
+        }
+    } else {
+        if (this.get("_id") && this.get("__v") !== undefined) {
+            this.synergykit.request({
+                method: "PUT",
+                endpoint: this.endpoint + "/" + this.get("_id")
+            }, callbacks, this)
+        } else {
+            this.synergykit.request({
+                method: "POST",
+                endpoint: this.endpoint
+            }, callbacks, this)
+        }
+    }
+
+}
+
+Data.prototype.destroy = function(callbacks) {
+    if (this.synergykit.strategy == "sockets") {
+        this.synergykit.socketDestroy(this, callbacks)
+    } else {
+        if (this.get("_id")) {
+            this.synergykit.request({
+                method: "DELETE",
+                endpoint: this.endpoint + "/" + this.get("_id")
+            }, callbacks, this)
+        } else {
+            this.synergykit.request({
+                method: "DELETE",
+                endpoint: this.endpoint
+            }, callbacks, this)
+        }
+    }
 }
 
 Data.prototype.addAccess = function(user_id, callbacks) {
@@ -138,45 +190,6 @@ Data.prototype.removeAccess = function(user_id, callbacks) {
     }, callbacks, this)
 }
 
-Data.prototype.save = function(callback) {
-    if (this.get("_id") && this.get("__v") !== undefined) {
-        this.synergykit.socketUpdate(this, callback)
-    } else {
-        this.synergykit.socketCreate(this, callback)
-    }
-}
-
-Data.prototype.destroy = function(callback) {
-    this.synergykit.socketDestroy(this, callback)
-}
-
-Data.prototype.saveHTTP = function(callbacks) {
-    if (this.get("_id") && this.get("__v") !== undefined) {
-        this.synergykit.request({
-            method: "PUT",
-            endpoint: this.endpoint + "/" + this.get("_id")
-        }, callbacks, this)
-    } else {
-        this.synergykit.request({
-            method: "POST",
-            endpoint: this.endpoint
-        }, callbacks, this)
-    }
-}
-
-Data.prototype.destroyHTTP = function(callbacks) {
-    if (this.get("_id")) {
-        this.synergykit.request({
-            method: "DELETE",
-            endpoint: this.endpoint + "/" + this.get("_id")
-        }, callbacks, this)
-    } else {
-        this.synergykit.request({
-            method: "DELETE",
-            endpoint: this.endpoint
-        }, callbacks, this)
-    }
-}
 
 Data.prototype.on = function(eventName, filter, callback) {
     var options = {
@@ -791,13 +804,29 @@ Query.prototype.find = function(callbacks) {
     if (!this.object) {
         throw Synergykit.Errors.NO_SYNERGYKIT_OBJECT
     } else {
-        this.synergykit.request({
-            method: "GET",
-            query: this.query,
-            endpoint: this.object.endpoint
-        }, callbacks, this.object)
+        if (this.object instanceof Synergykit.modules.Data) {
+            var queryString = ""
+            if (this.query) {
+                var counter = 0
+                for (var i in this.query) {
+                    if (counter == 0) {
+                        queryString += "?"
+                    } else {
+                        queryString += "&"
+                    }
+                    queryString += i + "=" + this.query[i]
+                    counter++
+                }
+            }
+            this.synergykit.socketGet(this.object, queryString, callbacks)
+        } else {
+            this.synergykit.request({
+                method: "GET",
+                query: this.query,
+                endpoint: this.object.endpoint
+            }, callbacks, this.object)
+        }
     }
-
 }
 
 Synergykit.checkParameter = function(parameter) {
@@ -854,15 +883,15 @@ Synergykit.rt = {
             console.log("Unsubscribed from collection '" + data.collection + "', event '" + data.message)
         }
     },
-    unauthorized: function(data) {
+    err: function(data) {
         if (data.synergykit.debug && data) {
-            console.log("Unauthorized: " + data.message)
+            console.log("Error: " + data.message)
         }
     },
     checkConnection: function(data) {
         if (Synergykit.rt.client == null) {
             Synergykit.rt.listeners.unsubscribed = Synergykit.rt.unsubscribed
-            Synergykit.rt.listeners.unauthorized = Synergykit.rt.unauthorized
+            Synergykit.rt.listeners.err = Synergykit.rt.err
             Synergykit.rt.connect(data)
 
             Synergykit.rt.client.onopen = function() {
@@ -1089,8 +1118,8 @@ Synergykit.rt = {
                 data: {
                     tenant: data.synergykit.tenant,
                     token: data.synergykit.token,
-                    eventName: data.eventName,
-                    message: data.message
+                    speakName: data.speakName,
+                    data: data.data
                 }
             })
         }
@@ -1100,8 +1129,21 @@ Synergykit.rt = {
     successCallback: function(data, result) {
         var callback
         if (data && data.object) {
-            data.object.set(result)
-            callback = data.object
+            if (Synergykit.isArray(result)) {
+                response = []
+                for (var i in result) {
+                    var clonedObject = null
+                    if (data.object instanceof Synergykit.modules.Data) {
+                        clonedObject = Synergykit.Data(data.object.collection)
+                    }
+                    clonedObject.set(result[i])
+                    response.push(clonedObject)
+                }
+                callback = response
+            } else {
+                data.object.set(result)
+                callback = data.object
+            }
         } else {
             callback = result
         }
@@ -1125,8 +1167,39 @@ Synergykit.rt = {
             data.callback.error(callback, 400)
         }
     },
+    get: function(data) {
+        Synergykit.rt.checkConnection(data)
+        var hash = (Math.random() * new Date().getTime()).toString(36).substring(2, 10);
+        var listener = function() {
+            Synergykit.rt.send({
+                event: "get",
+                data: {
+                    tenant: data.synergykit.tenant,
+                    token: data.synergykit.token,
+                    key: data.synergykit.key,
+                    collectionName: data.object.collection,
+                    hash: hash,
+                    id: data.object.get("_id"),
+                    query: data.query
+                }
+            })
+        }
+        listener()
+        Synergykit.rt.listeners["got"] = function(result) {
+            if (result.hash == hash) {
+                Synergykit.rt.successCallback(data, result.data)
+            }
+
+        }
+        Synergykit.rt.listeners["err"] = function(result) {
+            if (result.hash == hash) {
+                Synergykit.rt.errorCallback(data, result.data)
+            }
+        }
+    },
     create: function(data) {
         Synergykit.rt.checkConnection(data)
+        var hash = (Math.random() * new Date().getTime()).toString(36).substring(2, 10);
         var listener = function() {
             Synergykit.rt.send({
                 event: "create",
@@ -1134,6 +1207,7 @@ Synergykit.rt = {
                     tenant: data.synergykit.tenant,
                     token: data.synergykit.token,
                     key: data.synergykit.key,
+                    hash: hash,
                     collectionName: data.object.collection,
                     data: data.object.get()
                 }
@@ -1141,16 +1215,21 @@ Synergykit.rt = {
         }
         listener()
         Synergykit.rt.listeners["created"] = function(result) {
-            Synergykit.rt.successCallback(data, result)
+            if (result.hash == hash) {
+                Synergykit.rt.successCallback(data, result.data)
+            }
         }
-        Synergykit.rt.listeners["error"] = function(result) {
-            Synergykit.rt.errorCallback(data, result)
+        Synergykit.rt.listeners["err"] = function(result) {
+            if (result.hash == hash) {
+                Synergykit.rt.errorCallback(data, result.data)
+            }
         }
 
 
     },
     update: function(data) {
         Synergykit.rt.checkConnection(data)
+        var hash = (Math.random() * new Date().getTime()).toString(36).substring(2, 10);
         var listener = function() {
             Synergykit.rt.send({
                 event: "update",
@@ -1158,6 +1237,7 @@ Synergykit.rt = {
                     tenant: data.synergykit.tenant,
                     token: data.synergykit.token,
                     key: data.synergykit.key,
+                    hash: hash,
                     collectionName: data.object.collection,
                     id: data.object.get("_id"),
                     data: data.object.get()
@@ -1166,19 +1246,25 @@ Synergykit.rt = {
         }
         listener()
         Synergykit.rt.listeners["updated"] = function(result) {
-            Synergykit.rt.successCallback(data, result)
+            if (result.hash == hash) {
+                Synergykit.rt.successCallback(data, result.data)
+            }
         }
-        Synergykit.rt.listeners["error"] = function(result) {
-            Synergykit.rt.errorCallback(data, result)
+        Synergykit.rt.listeners["err"] = function(result) {
+            if (result.hash == hash) {
+                Synergykit.rt.errorCallback(data, result.data)
+            }
         }
 
     },
     destroy: function(data) {
         Synergykit.rt.checkConnection(data)
+        var hash = (Math.random() * new Date().getTime()).toString(36).substring(2, 10);
         var dataObject = {
             tenant: data.synergykit.tenant,
             token: data.synergykit.token,
             key: data.synergykit.key,
+            hash: hash,
             collectionName: data.object.collection
         }
         if (data.object.get("_id")) {
@@ -1192,10 +1278,14 @@ Synergykit.rt = {
         }
         listener()
         Synergykit.rt.listeners["deleted"] = function(result) {
-            Synergykit.rt.successCallback(data, result)
+            if (result.hash == hash) {
+                Synergykit.rt.successCallback(data, result.data)
+            }
         }
-        Synergykit.rt.listeners["error"] = function(result) {
-            Synergykit.rt.errorCallback(data, result)
+        Synergykit.rt.listeners["err"] = function(result) {
+            if (result.hash == hash) {
+                Synergykit.rt.errorCallback(data, result.data)
+            }
         }
 
     }
@@ -1637,6 +1727,28 @@ Synergykit.off = function(eventName) {
     })
 }
 
+Synergykit.socketGet = function(object, query, callback) {
+    var next = function() {
+        Synergykit.rt.get({
+            synergykit: Synergykit,
+            object: object,
+            query: query,
+            callback: callback
+        })
+    }
+    if (!Synergykit.token) {
+        var user = Synergykit.User()
+        user.set("authData", {
+            anonymous: {}
+        })
+        user.anonymousLogin({
+            success: next
+        })
+    } else {
+        next()
+    }
+}
+
 Synergykit.socketCreate = function(object, callback) {
     var next = function() {
         Synergykit.rt.create({
@@ -1746,12 +1858,12 @@ Synergykit.unsubscribe = function(options, object) {
 
 }
 
-Synergykit.speak = function(eventName, message) {
+Synergykit.speak = function(speakName, data) {
     var next = function() {
         Synergykit.rt.speak({
             synergykit: Synergykit,
-            eventName: eventName,
-            message: message
+            speakName: speakName,
+            data: data
         })
     }
     if (!Synergykit.token) {
