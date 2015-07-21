@@ -6,16 +6,12 @@ var TENANT = "synergykit-sample-app",
 
 
 Synergykit.Init(TENANT, KEY, {
-    debug: true,
-    local: true,
+    debug: false,
+    local: false,
     strategy: "sockets"
 })
 
-
-
-
-
-describe("Synergykit", function() {
+describe("SynergyKit", function() {
 
     describe("create data", function() {
         it("should return created data with code", function(done) {

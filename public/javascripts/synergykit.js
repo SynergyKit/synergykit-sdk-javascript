@@ -759,7 +759,7 @@ Query.prototype.isGreaterThan = function(parameter) {
     return this
 }
 
-Query.prototype.isGreaterOrEqual = function(parameter) {
+Query.prototype.isGreaterOrEqualThan = function(parameter) {
     this.query["$filter"] += " ge " + Synergykit.checkParameter(parameter)
     return this
 }
@@ -868,10 +868,14 @@ Synergykit.rt = {
             if (data.synergykit.debug) {
                 console.log(e.message)
             }
+            Synergykit.rt.reconnect(data)
         }
     },
     reconnect: function(data) {
         if (Synergykit.rt.attemps < Synergykit.rt.maxAttemps) {
+            if (data.synergykit.debug) {
+                console.log("Reconnecting")
+            }
             setTimeout(function() {
                 Synergykit.rt.connect(data)
             }, 1000 * Synergykit.rt.attemps)
@@ -884,7 +888,7 @@ Synergykit.rt = {
         }
     },
     err: function(data) {
-        if (data.synergykit.debug && data) {
+        if (data) {
             console.log("Error: " + data.message)
         }
     },
@@ -905,15 +909,25 @@ Synergykit.rt = {
                 if (data.synergykit.debug) {
                     console.log("Connection Error: " + error.toString());
                 }
+                setTimeout(function() {
+                    Synergykit.rt.reconnect(data)
+                    for (var i in Synergykit.rt.queue) {
+                        Synergykit.rt.queue[i]()
+                    }
+                }, 5000)
+
             }
             Synergykit.rt.client.onclose = function() {
                 if (data.synergykit.debug) {
                     console.log("Disconnected")
                 }
-                Synergykit.rt.reconnect(data)
-                for (var i in Synergykit.rt.queue) {
-                    Synergykit.rt.queue[i]()
-                }
+                setTimeout(function() {
+                    Synergykit.rt.reconnect(data)
+                    for (var i in Synergykit.rt.queue) {
+                        Synergykit.rt.queue[i]()
+                    }
+                }, 5000)
+
             }
             Synergykit.rt.client.onmessage = function(message) {
                 if (message && message.data) {
@@ -931,7 +945,7 @@ Synergykit.rt = {
         }
     },
     send: function(data) {
-        if (Synergykit.rt.connected) {
+        if (Synergykit.rt.connected && Synergykit.rt.client.readyState == 1) {
             Synergykit.rt.client.send(JSON.stringify(data))
         } else {
             setTimeout(function() {
@@ -991,6 +1005,7 @@ Synergykit.rt = {
                 }
                 listener()
                 Synergykit.rt.queue.push(listener)
+
                 Synergykit.rt.listeners[name] = function(result) {
                     if (data && data.object) {
                         data.object.set(result)
@@ -998,13 +1013,15 @@ Synergykit.rt = {
                     } else {
                         data.callback(result)
                     }
-
                 }
+
+
                 Synergykit.rt.listeners["subscribed_" + name] = function() {
                     if (data.synergykit.debug) {
                         console.log("Subscribed to collection '" + data.object.collection + "', event '" + data.eventName)
                     }
                 }
+
             }
         } else {
             name = data.eventName
@@ -1169,6 +1186,10 @@ Synergykit.rt = {
     },
     get: function(data) {
         Synergykit.rt.checkConnection(data)
+        Synergykit._start = new Date().getTime()
+        if(data.synergykit.debug) {
+            console.log("calling: GET", "/data/" + data.object.collection)
+        }
         var hash = (Math.random() * new Date().getTime()).toString(36).substring(2, 10);
         var listener = function() {
             Synergykit.rt.send({
@@ -1187,6 +1208,10 @@ Synergykit.rt = {
         listener()
         Synergykit.rt.listeners["got"] = function(result) {
             if (result.hash == hash) {
+                if(data.synergykit.debug) {
+                    Synergykit._end = new Date().getTime()
+                    console.log("Success (time: " + Synergykit.calcTimeDiff() + "): GET", "/data/" + data.object.collection)
+                }
                 Synergykit.rt.successCallback(data, result.data)
             }
 
@@ -1199,6 +1224,10 @@ Synergykit.rt = {
     },
     create: function(data) {
         Synergykit.rt.checkConnection(data)
+        Synergykit._start = new Date().getTime()
+        if(data.synergykit.debug) {
+            console.log("calling: POST", "/data/" + data.object.collection)
+        }
         var hash = (Math.random() * new Date().getTime()).toString(36).substring(2, 10);
         var listener = function() {
             Synergykit.rt.send({
@@ -1216,6 +1245,10 @@ Synergykit.rt = {
         listener()
         Synergykit.rt.listeners["created"] = function(result) {
             if (result.hash == hash) {
+                if(data.synergykit.debug) {
+                    Synergykit._end = new Date().getTime()
+                    console.log("Success (time: " + Synergykit.calcTimeDiff() + "): POST", "/data/" + data.object.collection)
+                }
                 Synergykit.rt.successCallback(data, result.data)
             }
         }
@@ -1229,6 +1262,10 @@ Synergykit.rt = {
     },
     update: function(data) {
         Synergykit.rt.checkConnection(data)
+        Synergykit._start = new Date().getTime()
+        if(data.synergykit.debug) {
+            console.log("calling: PUT", "/data/" + data.object.collection)
+        }
         var hash = (Math.random() * new Date().getTime()).toString(36).substring(2, 10);
         var listener = function() {
             Synergykit.rt.send({
@@ -1247,6 +1284,10 @@ Synergykit.rt = {
         listener()
         Synergykit.rt.listeners["updated"] = function(result) {
             if (result.hash == hash) {
+                if(data.synergykit.debug) {
+                    Synergykit._end = new Date().getTime()
+                    console.log("Success (time: " + Synergykit.calcTimeDiff() + "): PUT", "/data/" + data.object.collection)
+                }
                 Synergykit.rt.successCallback(data, result.data)
             }
         }
@@ -1259,6 +1300,10 @@ Synergykit.rt = {
     },
     destroy: function(data) {
         Synergykit.rt.checkConnection(data)
+        Synergykit._start = new Date().getTime()
+        if(data.synergykit.debug) {
+            console.log("calling: DELETE", "/data/" + data.object.collection)
+        }
         var hash = (Math.random() * new Date().getTime()).toString(36).substring(2, 10);
         var dataObject = {
             tenant: data.synergykit.tenant,
@@ -1279,6 +1324,10 @@ Synergykit.rt = {
         listener()
         Synergykit.rt.listeners["deleted"] = function(result) {
             if (result.hash == hash) {
+                if(data.synergykit.debug) {
+                    Synergykit._end = new Date().getTime()
+                    console.log("Success (time: " + Synergykit.calcTimeDiff() + "): DELETE", "/data/" + data.object.collection)
+                }
                 Synergykit.rt.successCallback(data, result.data)
             }
         }
