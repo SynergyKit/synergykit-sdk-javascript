@@ -6,11 +6,43 @@ var TENANT = "synergykit-sample-app",
 
 
 Synergykit.Init(TENANT, KEY, {
-    debug: false,
+    debug: true,
     local: false,
     strategy: "sockets"
 })
 
+var gameScore = Synergykit.Data("gamescore")
+
+gameScore.on("created", function(data) {
+    console.log("first", data.get("score"))
+})
+setTimeout(function() {
+    gameScore.off("created")
+}, 2000)
+
+
+setTimeout(function() {
+    gameScore.on("created", function(data) {
+        console.log("second", data.get("score"))
+    })
+    gameScore.on("created", function(data) {
+        console.log("third", data.get("score"))
+    })
+}, 3000)
+
+
+setTimeout(function() {
+    var gameScore = Synergykit.Data("GameScore")
+    gameScore.set("score", 1337)
+    gameScore.save({
+        success: function(gameScoreResult) {
+            DATA = gameScoreResult
+        }
+    })
+}, 4000)
+
+
+/*
 describe("SynergyKit", function() {
 
     describe("create data", function() {
@@ -74,4 +106,4 @@ describe("SynergyKit", function() {
             })
         })
     })
-})
+})*/

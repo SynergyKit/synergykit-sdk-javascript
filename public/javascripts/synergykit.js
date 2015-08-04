@@ -775,12 +775,12 @@ Query.prototype.isLessOrEqualThan = function(parameter) {
 }
 
 Query.prototype.isInArray = function(parameter) {
-    this.query["$filter"] += " in " + checkParameter(parameter)
+    this.query["$filter"] += " in " + Synergykit.checkParameter(parameter)
     return this
 }
 
 Query.prototype.isNotInArray = function(parameter) {
-    this.query["$filter"] += " nin " + checkParameter(parameter)
+    this.query["$filter"] += " nin " + Synergykit.checkParameter(parameter)
     return this
 }
 
@@ -856,6 +856,7 @@ Synergykit.rt = {
     client: null,
     socket: null,
     connected: false,
+    connecting: false,
     queue: [],
     listeners: {},
     attemps: 0,
@@ -893,7 +894,8 @@ Synergykit.rt = {
         }
     },
     checkConnection: function(data) {
-        if (Synergykit.rt.client == null) {
+        if (Synergykit.rt.client == null && !Synergykit.rt.connecting) {
+            Synergykit.rt.connecting = true
             Synergykit.rt.listeners.unsubscribed = Synergykit.rt.unsubscribed
             Synergykit.rt.listeners.err = Synergykit.rt.err
             Synergykit.rt.connect(data)
@@ -901,6 +903,7 @@ Synergykit.rt = {
             Synergykit.rt.client.onopen = function() {
                 Synergykit.rt.attemps = 0
                 Synergykit.rt.connected = true
+                Synergykit.rt.connecting = false
                 if (data.synergykit.debug) {
                     console.log("Connected")
                 }
@@ -954,175 +957,192 @@ Synergykit.rt = {
         }
     },
     addListener: function(data) {
-        Synergykit.rt.checkConnection(data)
+
         var name
         if (data.object) {
             if (data.filter && data.filter.name && data.filter.query) {
                 name = data.eventName + "_" + data.object.collection + "_" + data.filter.name
-                var listener = function() {
-                    Synergykit.rt.send({
-                        event: "subscribe",
-                        data: {
-                            tenant: data.synergykit.tenant,
-                            key: data.synergykit.key,
-                            token: data.synergykit.token,
-                            filter: data.filter,
-                            eventName: data.eventName,
-                            collectionName: data.object.collection
-                        }
-                    })
-                }
-                listener()
-                Synergykit.rt.queue.push(listener)
-
-                Synergykit.rt.listeners[name] = function(result) {
-                    if (data && data.object) {
-                        data.object.set(result)
-                        data.callback(data.object)
-                    } else {
-                        data.callback(result)
+                if (!Synergykit.rt.listeners[name]) {
+                    Synergykit.rt.checkConnection(data)
+                    var listener = function() {
+                        Synergykit.rt.send({
+                            event: "subscribe",
+                            data: {
+                                tenant: data.synergykit.tenant,
+                                key: data.synergykit.key,
+                                token: data.synergykit.token,
+                                filter: data.filter,
+                                eventName: data.eventName,
+                                collectionName: data.object.collection
+                            }
+                        })
                     }
+                    listener()
+                    Synergykit.rt.queue.push(listener)
 
-                }
-                Synergykit.rt.listeners["subscribed_" + name] = function() {
-                    if (data.synergykit.debug) {
-                        console.log("Subscribed to collection '" + data.object.collection + "', event '" + data.eventName + "', filter '" + data.filter.name)
+                    Synergykit.rt.listeners[name] = function(result) {
+                        if (data && data.object) {
+                            data.object.set(result)
+                            data.callback(data.object)
+                        } else {
+                            data.callback(result)
+                        }
+
+                    }
+                    Synergykit.rt.listeners["subscribed_" + name] = function() {
+                        if (data.synergykit.debug) {
+                            console.log("Subscribed to collection '" + data.object.collection + "', event '" + data.eventName + "', filter '" + data.filter.name)
+                        }
                     }
                 }
             } else {
                 name = data.eventName + "_" + data.object.collection
-                var listener = function() {
-                    Synergykit.rt.send({
-                        event: "subscribe",
-                        data: {
-                            tenant: data.synergykit.tenant,
-                            key: data.synergykit.key,
-                            token: data.synergykit.token,
-                            eventName: data.eventName,
-                            collectionName: data.object.collection
-                        }
-                    })
-                }
-                listener()
-                Synergykit.rt.queue.push(listener)
-
-                Synergykit.rt.listeners[name] = function(result) {
-                    if (data && data.object) {
-                        data.object.set(result)
-                        data.callback(data.object)
-                    } else {
-                        data.callback(result)
+                if (!Synergykit.rt.listeners[name]) {
+                    Synergykit.rt.checkConnection(data)
+                    var listener = function() {
+                        Synergykit.rt.send({
+                            event: "subscribe",
+                            data: {
+                                tenant: data.synergykit.tenant,
+                                key: data.synergykit.key,
+                                token: data.synergykit.token,
+                                eventName: data.eventName,
+                                collectionName: data.object.collection
+                            }
+                        })
                     }
-                }
+                    listener()
+                    Synergykit.rt.queue.push(listener)
+
+                    Synergykit.rt.listeners[name] = function(result) {
+                        if (data && data.object) {
+                            data.object.set(result)
+                            data.callback(data.object)
+                        } else {
+                            data.callback(result)
+                        }
+                    }
 
 
-                Synergykit.rt.listeners["subscribed_" + name] = function() {
-                    if (data.synergykit.debug) {
-                        console.log("Subscribed to collection '" + data.object.collection + "', event '" + data.eventName)
+                    Synergykit.rt.listeners["subscribed_" + name] = function() {
+                        if (data.synergykit.debug) {
+                            console.log("Subscribed to collection '" + data.object.collection + "', event '" + data.eventName)
+                        }
                     }
                 }
 
             }
         } else {
             name = data.eventName
-            var listener = function() {
-                Synergykit.rt.send({
-                    event: "subscribe",
-                    data: {
-                        tenant: data.synergykit.tenant,
-                        key: data.synergykit.key,
-                        token: data.synergykit.token,
-                        eventName: data.eventName
-                    }
-                })
-            }
-            listener()
-            Synergykit.rt.queue.push(listener)
-            Synergykit.rt.listeners[data.eventName] = function(result) {
-                if (data && data.object) {
-                    data.object.set(result)
-                    data.callback(data.object)
-                } else {
-                    data.callback(result)
+            if (!Synergykit.rt.listeners[name]) {
+                Synergykit.rt.checkConnection(data)
+                var listener = function() {
+                    Synergykit.rt.send({
+                        event: "subscribe",
+                        data: {
+                            tenant: data.synergykit.tenant,
+                            key: data.synergykit.key,
+                            token: data.synergykit.token,
+                            eventName: data.eventName
+                        }
+                    })
                 }
+                listener()
+                Synergykit.rt.queue.push(listener)
+                Synergykit.rt.listeners[data.eventName] = function(result) {
+                    if (data && data.object) {
+                        data.object.set(result)
+                        data.callback(data.object)
+                    } else {
+                        data.callback(result)
+                    }
 
-            }
-            Synergykit.rt.listeners["subscribed_" + name] = function() {
-                if (data.synergykit.debug) {
-                    console.log("Subscribed to event '" + name)
+                }
+                Synergykit.rt.listeners["subscribed_" + name] = function() {
+                    if (data.synergykit.debug) {
+                        console.log("Subscribed to event '" + name)
+                    }
                 }
             }
         }
     },
     removeListener: function(data) {
         var name
-        Synergykit.rt.checkConnection(data)
         if (data.object) {
             if (data.filter) {
                 name = data.eventName + "_" + data.object.collection + "_" + data.filter.name
-                delete Synergykit.rt.listeners[name]
-                var listener = function() {
-                    Synergykit.rt.send({
-                        event: "unsubscribe",
-                        data: {
-                            tenant: data.synergykit.tenant,
-                            key: data.synergykit.key,
-                            token: data.synergykit.token,
-                            filter: data.filter,
-                            eventName: data.eventName,
-                            collectionName: data.object.collection
+                if (Synergykit.rt.listeners[name]) {
+                    Synergykit.rt.checkConnection(data)
+                    delete Synergykit.rt.listeners[name]
+                    var listener = function() {
+                        Synergykit.rt.send({
+                            event: "unsubscribe",
+                            data: {
+                                tenant: data.synergykit.tenant,
+                                key: data.synergykit.key,
+                                token: data.synergykit.token,
+                                filter: data.filter,
+                                eventName: data.eventName,
+                                collectionName: data.object.collection
+                            }
+                        })
+                    }
+                    listener()
+                    Synergykit.rt.queue.push(listener)
+                    Synergykit.rt.listeners["unsubscribed_" + name] = function() {
+                        if (data.synergykit.debug) {
+                            console.log("Unsubscribed from collection '" + data.object.collection + "', event '" + data.eventName + "', filter '" + data.filter.name)
                         }
-                    })
-                }
-                listener()
-                Synergykit.rt.queue.push(listener)
-                Synergykit.rt.listeners["unsubscribed_" + name] = function() {
-                    if (data.synergykit.debug) {
-                        console.log("Unsubscribed from collection '" + data.object.collection + "', event '" + data.eventName + "', filter '" + data.filter.name)
                     }
                 }
             } else {
                 name = data.eventName + "_" + data.object.collection
-                delete Synergykit.rt.listeners[name]
-                var listener = function() {
-                    Synergykit.rt.send({
-                        event: "unsubscribe",
-                        data: {
-                            tenant: data.synergykit.tenant,
-                            key: data.synergykit.key,
-                            token: data.synergykit.token,
-                            eventName: data.eventName,
-                            collectionName: data.object.collection
+                if (Synergykit.rt.listeners[name]) {
+                    Synergykit.rt.checkConnection(data)
+                    delete Synergykit.rt.listeners[name]
+                    var listener = function() {
+                        Synergykit.rt.send({
+                            event: "unsubscribe",
+                            data: {
+                                tenant: data.synergykit.tenant,
+                                key: data.synergykit.key,
+                                token: data.synergykit.token,
+                                eventName: data.eventName,
+                                collectionName: data.object.collection
+                            }
+                        })
+                    }
+                    listener()
+                    Synergykit.rt.queue.push(listener)
+                    Synergykit.rt.listeners["unsubscribed_" + name] = function() {
+                        if (data.synergykit.debug) {
+                            console.log("Unsubscribed from collection '" + data.object.collection + "', event '" + data.eventName)
                         }
-                    })
-                }
-                listener()
-                Synergykit.rt.queue.push(listener)
-                Synergykit.rt.listeners["unsubscribed_" + name] = function() {
-                    if (data.synergykit.debug) {
-                        console.log("Unsubscribed from collection '" + data.object.collection + "', event '" + data.eventName)
                     }
                 }
             }
         } else {
             name = data.eventName
-            delete Synergykit.rt.listeners[name]
-            var listener = function() {
-                Synergykit.rt.send({
-                    event: "unsubscribe",
-                    data: {
-                        tenant: data.synergykit.tenant,
-                        key: data.synergykit.key,
-                        token: data.synergykit.token,
-                        eventName: data.eventName,
+            if (Synergykit.rt.listeners[name]) {
+                Synergykit.rt.checkConnection(data)
+                delete Synergykit.rt.listeners[name]
+                var listener = function() {
+                    Synergykit.rt.send({
+                        event: "unsubscribe",
+                        data: {
+                            tenant: data.synergykit.tenant,
+                            key: data.synergykit.key,
+                            token: data.synergykit.token,
+                            eventName: data.eventName,
+                        }
+                    })
+                }
+                listener()
+                Synergykit.rt.queue.push(listener)
+                Synergykit.rt.listeners["unsubscribed_" + name] = function() {
+                    if (data.synergykit.debug) {
+                        console.log("Unsubscribed from event '" + data.eventName)
                     }
-                })
-            }
-            listener()
-            Synergykit.rt.queue.push(listener)
-            Synergykit.rt.listeners["unsubscribed_" + name] = function() {
-                if (data.synergykit.debug) {
-                    console.log("Unsubscribed from event '" + data.eventName)
                 }
             }
         }
@@ -1187,7 +1207,7 @@ Synergykit.rt = {
     get: function(data) {
         Synergykit.rt.checkConnection(data)
         Synergykit._start = new Date().getTime()
-        if(data.synergykit.debug) {
+        if (data.synergykit.debug) {
             console.log("calling: GET", "/data/" + data.object.collection)
         }
         var hash = (Math.random() * new Date().getTime()).toString(36).substring(2, 10);
@@ -1208,7 +1228,7 @@ Synergykit.rt = {
         listener()
         Synergykit.rt.listeners["got"] = function(result) {
             if (result.hash == hash) {
-                if(data.synergykit.debug) {
+                if (data.synergykit.debug) {
                     Synergykit._end = new Date().getTime()
                     console.log("Success (time: " + Synergykit.calcTimeDiff() + "): GET", "/data/" + data.object.collection)
                 }
@@ -1225,7 +1245,7 @@ Synergykit.rt = {
     create: function(data) {
         Synergykit.rt.checkConnection(data)
         Synergykit._start = new Date().getTime()
-        if(data.synergykit.debug) {
+        if (data.synergykit.debug) {
             console.log("calling: POST", "/data/" + data.object.collection)
         }
         var hash = (Math.random() * new Date().getTime()).toString(36).substring(2, 10);
@@ -1245,7 +1265,7 @@ Synergykit.rt = {
         listener()
         Synergykit.rt.listeners["created"] = function(result) {
             if (result.hash == hash) {
-                if(data.synergykit.debug) {
+                if (data.synergykit.debug) {
                     Synergykit._end = new Date().getTime()
                     console.log("Success (time: " + Synergykit.calcTimeDiff() + "): POST", "/data/" + data.object.collection)
                 }
@@ -1263,7 +1283,7 @@ Synergykit.rt = {
     update: function(data) {
         Synergykit.rt.checkConnection(data)
         Synergykit._start = new Date().getTime()
-        if(data.synergykit.debug) {
+        if (data.synergykit.debug) {
             console.log("calling: PUT", "/data/" + data.object.collection)
         }
         var hash = (Math.random() * new Date().getTime()).toString(36).substring(2, 10);
@@ -1284,7 +1304,7 @@ Synergykit.rt = {
         listener()
         Synergykit.rt.listeners["updated"] = function(result) {
             if (result.hash == hash) {
-                if(data.synergykit.debug) {
+                if (data.synergykit.debug) {
                     Synergykit._end = new Date().getTime()
                     console.log("Success (time: " + Synergykit.calcTimeDiff() + "): PUT", "/data/" + data.object.collection)
                 }
@@ -1301,7 +1321,7 @@ Synergykit.rt = {
     destroy: function(data) {
         Synergykit.rt.checkConnection(data)
         Synergykit._start = new Date().getTime()
-        if(data.synergykit.debug) {
+        if (data.synergykit.debug) {
             console.log("calling: DELETE", "/data/" + data.object.collection)
         }
         var hash = (Math.random() * new Date().getTime()).toString(36).substring(2, 10);
@@ -1324,7 +1344,7 @@ Synergykit.rt = {
         listener()
         Synergykit.rt.listeners["deleted"] = function(result) {
             if (result.hash == hash) {
-                if(data.synergykit.debug) {
+                if (data.synergykit.debug) {
                     Synergykit._end = new Date().getTime()
                     console.log("Success (time: " + Synergykit.calcTimeDiff() + "): DELETE", "/data/" + data.object.collection)
                 }
@@ -1763,17 +1783,44 @@ Synergykit.Query = function(object) {
 }
 
 Synergykit.on = function(eventName, callback) {
-    Synergykit.rt.addListener({
-        synergykit: Synergykit,
-        eventName: eventName,
-        callback: callback
-    })
+    var next = function() {
+        Synergykit.rt.addListener({
+            eventName: eventName,
+            synergykit: Synergykit,
+            callback: callback
+        })
+    }
+    if (!Synergykit.token) {
+        var user = Synergykit.User()
+        user.set("authData", {
+            anonymous: {}
+        })
+        user.anonymousLogin({
+            success: next
+        })
+    } else {
+        next()
+    }
 }
 Synergykit.off = function(eventName) {
-    Synergykit.rt.removeListener({
-        eventName: eventName,
-        synergykit: Synergykit
-    })
+    var next = function() {
+        Synergykit.rt.removeListener({
+            eventName: eventName,
+            synergykit: Synergykit,
+            callback: callback
+        })
+    }
+    if (!Synergykit.token) {
+        var user = Synergykit.User()
+        user.set("authData", {
+            anonymous: {}
+        })
+        user.anonymousLogin({
+            success: next
+        })
+    } else {
+        next()
+    }
 }
 
 Synergykit.socketGet = function(object, query, callback) {
