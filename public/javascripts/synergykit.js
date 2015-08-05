@@ -1806,8 +1806,7 @@ Synergykit.off = function(eventName) {
     var next = function() {
         Synergykit.rt.removeListener({
             eventName: eventName,
-            synergykit: Synergykit,
-            callback: callback
+            synergykit: Synergykit
         })
     }
     if (!Synergykit.token) {
